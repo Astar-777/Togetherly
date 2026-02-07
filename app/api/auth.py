@@ -3,12 +3,7 @@ from sqlalchemy.orm import Session
 
 
 from app.api.deps import get_db
-from app.core.security import (
-    get_password_hash,
-    verify_password,
-    create_access_token
-)
-from app.models.user import User
+from app.services.auth import AuthService
 from app.schemas.auth import UserRegister, UserLogin, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -16,38 +11,27 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=TokenResponse)
 def register_user(payload: UserRegister, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == payload.email).first()
-    if existing:
+    try:
+        token = AuthService.register_user(db, payload)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered."
+            detail=str(e)
         )
     
-    user = User(
-        email=payload.email,
-        hashed_password=get_password_hash(payload.password)
-    )
-
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    token = create_access_token(data={"sub": str(user.id)})
-
 
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user or verify_password(payload.password, user.hashed_password) is False:
+    try:
+        token = AuthService.login_user(db, payload)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials.",
+            detail=str(e),
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    token = create_access_token(data={"sub": str(user.id)})
-
     return {"access_token": token, "token_type": "bearer"}
