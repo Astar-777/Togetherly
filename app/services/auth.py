@@ -28,6 +28,6 @@ class AuthService:
         user = db.query(User).filter(User.email == payload.email).first()
         if not user or not verify_password(payload.password, user.hashed_password):
             raise ValueError("Invalid credentials")
-        
-        token = create_access_token(data={"sub": user.email})
+
+        token = create_access_token(user.email)
         return token
