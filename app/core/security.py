@@ -19,10 +19,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(
-        data: str,
+        data: dict,
         expires_delta: Optional[timedelta] = None
 ) -> str:
-    to_encode = {"sub": data}
+    to_encode = data.copy()
 
     expire = datetime.now(timezone.utc) + (
         expires_delta if expires_delta else timedelta(minutes=settings.access_token_expire_minutes)

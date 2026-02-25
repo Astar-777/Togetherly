@@ -19,7 +19,7 @@ class AuthService:
         db.commit()
         db.refresh(user)
 
-        token = create_access_token(data={"sub": user.email})
+        token = create_access_token(data={"sub": str(user.id)})
         return token
     
 
@@ -29,5 +29,5 @@ class AuthService:
         if not user or not verify_password(payload.password, user.hashed_password):
             raise ValueError("Invalid credentials")
 
-        token = create_access_token(user.email)
+        token = create_access_token(data={"sub": str(user.id)})
         return token
