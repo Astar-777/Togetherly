@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.schemas.rooms import RoomCreate, RoomJoin, RoomResponse
-from app.services.room import RoomService
+from app.services.room_service import RoomService
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
 
