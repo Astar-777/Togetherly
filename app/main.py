@@ -1,8 +1,13 @@
 from fastapi import FastAPI
 
-from app.api import auth
+from app.api import auth, rooms
 
 app = FastAPI()
 
-app.include_router(auth.router)
+routers = [
+    auth.router,
+    rooms.router
+]
 
+for router in routers:
+    app.include_router(router)
