@@ -5,6 +5,7 @@ from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.schemas.queue import QueueItemCreate, QueueItemResponse, MoveItemRequest
 from app.services.queue_service import QueueService
+from app.core.exceptions import RateLimitError
 
 router = APIRouter(prefix="/rooms/{room_id}/queue", tags=["queue"])
 
@@ -32,6 +33,8 @@ def add_item(
         return QueueService.add_item(db, current_user, room_id, payload.title)
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except RateLimitError as e:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e))
 
 
 @router.post("/{item_id}/move", response_model=QueueItemResponse)

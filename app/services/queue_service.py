@@ -5,6 +5,22 @@ from app.models.queue_item import QueueItem
 from app.models.room_member import RoomMember
 from app.models.user import User
 
+from app.core.redis import redis_client
+from app.core.exceptions import RateLimitError
+import json
+
+
+def check_rate_limit(user_id: int, room_id: int):
+    key = f"rate:{user_id}:{room_id}"
+
+    count = redis_client.incr(key)
+
+    if count == 1:
+        redis_client.expire(key, 60)
+
+    if count > 5:
+        raise RateLimitError("Rate limit exceeded")
+
 
 class QueueService:
 
@@ -28,14 +44,36 @@ class QueueService:
     def get_queue(db: Session, user: User, room_id: int):
         QueueService._ensure_member(db, user, room_id)
 
-        return db.query(QueueItem).filter(
+        cache_key = f"queue:{room_id}"
+
+        cached = redis_client.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
+        items = db.query(QueueItem).filter(
             QueueItem.room_id == room_id
         ).order_by(QueueItem.position).all()
-    
+
+        result = [
+            {
+                "id": item.id,
+                "title": item.title,
+                "position": item.position,
+                "added_by": item.added_by
+            }
+            for item in items
+        ]
+
+        redis_client.setex(cache_key, 60, json.dumps(result))
+
+        return result
+
     @staticmethod
     def add_item(db: Session, user: User, room_id: int, title: str):
         QueueService._ensure_member(db, user, room_id)
         QueueService._lock_room_queue(db, room_id)
+
+        check_rate_limit(user.id, room_id)
 
         max_position = db.query(func.max(QueueItem.position)).filter(
             QueueItem.room_id == room_id
@@ -52,6 +90,7 @@ class QueueService:
 
         db.add(item)
         db.commit()
+        redis_client.delete(f"queue:{room_id}")
         db.refresh(item)
         
         return item
@@ -103,7 +142,8 @@ class QueueService:
 
         item.position = new_position
 
-        db.commit()    
+        db.commit()
+        redis_client.delete(f"queue:{room_id}")
         db.refresh(item)
 
         return item
@@ -134,3 +174,4 @@ class QueueService:
         )
 
         db.commit()
+        redis_client.delete(f"queue:{room_id}")
